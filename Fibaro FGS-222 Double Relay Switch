@@ -64,7 +64,7 @@ fingerprint deviceId: "0x1001", inClusters:"0x86, 0x72, 0x85, 0x60, 0x8E, 0x25, 
        		options: [
                     ["0" : "0 - Commands are sent when device is turned on and off"],
                     ["1" : "1 - Commands are sent when device is turned off"],
-                	["2" : "1 - Commands are sent when device is turned off"]
+                	["2" : "2 - Commands are sent when device is turned off"]
                 ]
 
        		input name: "param7", type: "enum", defaultValue: "0", required: true,
@@ -73,7 +73,7 @@ fingerprint deviceId: "0x1001", inClusters:"0x86, 0x72, 0x85, 0x60, 0x8E, 0x25, 
        		options: [
                     ["0" : "0 - Commands are sent when device is turned on and off"],
                     ["1" : "1 - Commands are sent when device is turned off"],
-                	["2" : "1 - Commands are sent when device is turned off"]
+                	["2" : "2 - Commands are sent when device is turned off"]
                 ]
 
 		input name: "param13", type: "enum", defaultValue: "0", required: true,
