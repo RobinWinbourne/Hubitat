@@ -1,0 +1,609 @@
+/**
+ *  
+ *	Fibaro Dimmer 2 (FGD-212) Driver - For use on Hubitat
+ *  
+ *	Author: Robin Winbourne
+ *	Date: 2018-04-01 
+ */
+
+metadata {
+	definition (name: "Fibaro Dimmer 2", namespace: "Hubitat", author: "Robin Winbourne") {
+		capability "Energy Meter"
+		capability "Actuator"
+		capability "Switch"
+		capability "Power Meter"
+		capability "Polling"
+		capability "Refresh"
+		capability "Sensor"
+		capability "Configuration"
+        capability "Switch Level"
+
+        attribute "scene", "number"           //Extending Fibaro Dimmer 2 devices with scene attribute
+        attribute "syncPending", "bool"       // Updates when parameters have synced
+        
+		command "reset"
+        command "changeSingleParam"
+
+       // Fingerprints:
+        fingerprint mfr: "010F", prod: "0102", model: "1000"
+        fingerprint type: "1101", mfr: "010F", cc: "5E,86,72,59,73,22,31,32,71,56,98,7A"
+        fingerprint type: "1101", mfr: "010F", cc: "5E,86,72,59,73,22,31,32,71,56,98,7A", sec: "20,5A,85,26,8E,60,70,75,27", secOut: "2B"
+	}
+
+   preferences {
+       input name: "param1", type: "number", range: "1..98", defaultValue: "1", required: true,
+            title: "1. Minimum brightness level. " +
+                   "Set automatically during the calibration process, but can be changed afterwards. " +
+                   "Values: 1-98 = Brightness level (%). Default value: 1."
+               
+       input name: "param2", type: "number", range: "2..99", defaultValue: "99", required: true,
+            title: "2. maximum brightness level. " +
+                   "Set automatically during the calibration process, but can be changed afterwards. " +
+                   "Values: 2-99 = Brightness level (%). Default value: 99."
+
+       input name: "param3", type: "number", range: "1..99", defaultValue: "1", required: true,
+            title: "3. Incandescence Level of CFLs. " +
+                   "The Dimmer 2 will set to this value after first switch on. It is required for warming up and switching dimmable compact fluorescent lamps and certain types of light sources. " +
+                   "Values: 1-99 = Brightness level (%). Default value: 1"
+
+        input name: "param4", type: "number", range: "0..255", defaultValue: "0", required: true,
+            title: "4. Incandescence Time of CFLs. " +
+                   "The time required for switching compact fluorescent lamps and certain types of light sources. " +
+                   "Values: 0 = Function Disabled. 1-255 = 0.1-25.5s in 0.1s steps. Default value: 0."
+
+        input name: "param5", type: "number", range: "1..99", defaultValue: "1", required: true,
+            title: "5. Dimming Step Size (Auto). " +
+                   "The percentage value of a dimming step during automatic control. " +
+                   "Values: 1-99 = Dimming step (%). Default value: 1."
+
+        input name: "param6", type: "number", range: "0..255", defaultValue: "1", required: true,
+            title: "6. Dimming Step Time (Auto). " +
+                   "The time of a single dimming step during automatic control. " +
+                   "Values: 0-255 = 0-2.55s, in 10ms steps. Default value: 1."
+
+        input name: "param7", type: "number", range: "1..99", defaultValue: "1", required: true,
+            title: "7. Dimming Step Size (Manual). " +
+                   "The percentage value of a dimming step during manual control. " +
+                   "Values: 1-99 = Dimming step (%). Default value: 1."
+
+        input name: "param8", type: "number", range: "0..255", defaultValue: "5", required: true,
+            title: "8. Dimming Step Time (Manual). " +
+                   "The time of a single dimming step during manual control. " +
+                   "Values: 0-255 = 0-2.55s, in 10ms steps. Default value: 5."
+       
+        input name: "param9", type: "enum", defaultValue: "1", required: true,
+            options: [["0" : "0 - Off"],
+                      ["1" : "1 - Restore Previous State"]],
+            title: "9. Dimmer dtate After Power Failure. " +
+                   "The Dimmer can save its current state before a power failure and restore that state after a power failure. Default value: 1"
+
+        input name: "param10", type: "number", range: "0..32767", defaultValue: "0", required: true,
+            title: "10. Timer functionality (auto off). " +
+                   "Automatically switch off the device after a specified time. " +
+                   "Values: 0 = Function Disabled. 1-32767 = time in seconds. Default value: 0."
+
+        input name: "param11", type: "enum", defaultValue: "255", required: true,
+            options: [["0" : "0 - All ON not active, All OFF not active"],
+                      ["1" : "1 - All ON not active, All OFF active"],
+                      ["2" : "2 - All ON active, All OFF not active"],
+                      ["255" : "255 - All ON active, All OFF active"]],
+            title: "11. ALL ON / ALL OFF function. " +
+                   "Dimmer response to SWITCH_ALL_SET commands which can be sent from other zwave devices. Default value: 255."
+       
+        input name: "param13", type: "enum", defaultValue: "0", required: true,
+            options: [["0" : "0 - Readout"],
+                      ["1" : "1 - force auto-calibration of the load WITHOUT Fibaro Bypass 2"],
+                      ["2" : "2 - force auto-calibration of the load WITH Fibaro Bypass 2"]],
+            title: "13. Force auto-calibration. " +
+                   "Set this parameter to 1 or 2 to trigger an auto calibration. Parameter switches back to 0 upon completion (but not updated here). Default value: 0."
+
+        input name: "param15", type: "number", range: "0..99", defaultValue: "30", required: true,
+            title: "15. Burnt out bulb detection. " +
+                   "Power variation, compared to standard power consumption (measured during calibration). " +
+                   "Values: 0 = Function Disabled. 1-99 = Power variation (%). Default value: 30."
+
+        input name: "param16", type: "number", range: "0..255", defaultValue: "5", required: true,
+            title: "16. Time Delay for Burnt Out Bulb/Overload Detection. " +
+                   "Time delay (in seconds) for LOAD ERROR or OVERLOAD detection. " +
+                   "Values: 0 = Detection Disabled. 1-255 = Time delay (s). Default value: 5."
+
+        input name: "param19", type: "number", range: "0..99", defaultValue: "0", required: true,
+            title: "19. Forced switch on brightness level. " +
+                   "Switching on the dimmer will always set this brightness level. " +
+                   "Values: 0 = Function Disabled. 1-99 = Brightness level (%). Default value: 0."
+               
+       input name: "param20", type: "enum", defaultValue: "0", required: true,
+            options: [["0" : "0 - Momentary switch"],
+                      ["1" : "1 - Toggle switch"],
+                      ["2" : "2 - Roller blind switch"]],
+            title: "20. Switch Type Selection. " +
+                   "Physical switch type: Momentary, Toggle, or Roller Blind (middle rest position, up to brighten, down to dim). Default value: 0."
+          
+       input name: "param21", type: "enum", defaultValue: "0", required: true,
+            options: [["0" : "0 - 0xFF"],
+                      ["1" : "1 - Current Level"]],
+            title: "21. Value Sent to Associated Devices on Single Click. " +
+         		   "0xFF will set associated devices to their last-saved state. Current Level will synchronise the state of all devices with this dimmer. Default value: 0."
+
+       input name: "param22", type: "enum", defaultValue: "0", required: true,
+            options: [["0" : "0 - Change on Every Switch State Change"],
+                      ["1" : "1 - Synchronise with Switch State"]],
+            title: "22. Assign Toggle Switch Status to Device Status. " +
+         		   "By default, each change of toggle switch position results in an on/off action regardless the physical connection of contacts. Default value: 0."
+
+       input name: "param23", type: "enum", defaultValue: "1", required: true,
+            options: [["0" : "0 - Double-click DISABLED"],
+                      ["1" : "1 - Double-click ENABLED"]],
+            title: "23. Double-click sets Max Brightness. " +
+         		   "Double-clicking will set brightness level to maximum. Default value: 1."
+
+       input name: "param24", type: "number", range: "0..31", defaultValue: "0", required: true,
+            title: "24. Command Frames Sent to 2nd and 3rd Association Groups (S1 Associations). " +
+                   "Determines which actions will not result in sending frames to association groups. Values (add together): " +
+                   "0 = All actions sent to association groups, " +
+                   "1 = Do not send when switching ON (single click), " +
+                   "2 = Do not send when switching OFF (single click), " +
+                   "4 = Do not send when changing dimming level (holding and releasing), " +
+                   "8 = Do not send on double click, " +
+                   "16 = Send 0xFF value on double click. Default value: 0."
+
+       input name: "param25", type: "number", range: "0..31", defaultValue: "0", required: true,
+            title: "25. Command Frames Sent to 4th and 5th Association Groups (S2 Associations). " +
+                   "Determines which actions will not result in sending frames to association groups. Values (add together): " +
+                   "0 = All actions sent to association groups, " +
+                   "1 = Do not send when switching ON (single click), " +
+                   "2 = Do not send when switching OFF (single click), " +
+                   "4 = Do not send when changing dimming level (holding and releasing), " +
+                   "8 = Do not send on double click, " +
+                   "16 = Send 0xFF value on double click. Default value: 0."
+              
+       input name: "param26", type: "enum", defaultValue: "0", required: true,
+            options: [["0" : "0 - 3-way switch function for S2 DISABLED"],
+                      ["1" : "1 - 3-way switch function for S2 ENABLED"]],
+            title: "26. 3-way Switch Function. " +
+         		   "Switch S2 also controls the dimmer when in 3-way switch mode. Function is disabled if parameter #20 is set to 2 (roller blind switch). Default value: 0."
+              
+       input name: "param27", type: "number", range: "0..15", defaultValue: "15", required: true,
+            title: "27. Association Group Security Mode. " +
+                   "Defines if commands sent to association groups are secure or non-secure. Values (add together): " +
+                   "0 = all groups sent as non-secure, " +
+                   "1 = 2nd group sent as secure, " +
+                   "2 = 3rd group sent as secure, " +
+                   "4 = 4th group sent as secure, " +
+                   "8 = 5th group sent as secure. " +
+                   "E.g. 15 = all groups (2-5) sent as secure. Default value: 15."
+
+       input name: "param28", type: "enum", defaultValue: "0", required: true,
+            options: [["0" : "0 - Function DISABLED"],
+                      ["1" : "1 - Function ENABLED"]],
+            title: "28. Scene Activation. " +
+         		   "Defines if SCENE_ACTIVATION_SET commands are sent. " +
+                   "For Momentary: S1 input: 16 = 1 x click, 14 = 2 x click, 12 = hold, 13 = release. " +
+                   "S2 input: 26 = 1 x click, 24 = 2 x click, 25 = 3 x click, 22 = hold, 23 = release (see manual for other switch types). Default value: 0."
+       
+       input name: "param29", type: "enum", defaultValue: "0", required: true,
+            options: [["0" : "0 - Standard Mode"],
+                      ["1" : "1 - S1 operates as S2, S2 operates as S1"]],
+            title: "29. Swap S1 and S2. " +
+         		   "Swap the roles of S1 and S2 without changes to physical wiring. Default value: 0."
+              
+       input name: "param30", type: "enum", defaultValue: "2", required: true,
+            options: [["0" : "0 - Force leading edge mode"],
+                      ["1" : "1 - Force trailing edge mode"],
+                      ["2" : "2 - Automatic (based on auto-calibration)"]],
+            title: "30. Load Control Mode. " +
+         		   "Override the dimmer mode (i.e. leading or trailing edge). Default value: 2."
+        
+       input name: "param32", type: "enum", defaultValue: "2", required: true,
+            options: [["0" : "0 - On/Off mode DISABLED (dimming is possible)"],
+                      ["1" : "1 - On/Off mode ENABLED (dimming not possible)"],
+                      ["2" : "2 - Automatic (based on auto-calibration)"]],
+            title: "32. On/Off Mode. " +
+         		   "This mode is necessary when connecting non-dimmable light sources. Default value: 2."
+
+       input name: "param34", type: "enum", defaultValue: "1", required: true,
+            options: [["0" : "0 - No soft-start"],
+                      ["1" : "1 - Short soft-start (0.1s)"],
+                      ["2" : "2 - Long soft-start (0.5s)"]],
+            title: "34. Soft-Start. " +
+         		   "Time required to warm up the filament of halogen bulbs. Default value: 1."
+
+       input name: "param35", type: "enum", defaultValue: "1", required: true,
+            options: [["0" : "0 - No auto-calibration"],
+                      ["1" : "1 - Auto-calibration after first power on only"],
+                      ["2" : "2 - Auto-calibration after each power on"],
+                      ["3" : "3 - Auto-calibration after first power on and after each LOAD ERROR"],
+                      ["4" : "4 - Auto-calibration after each power on and after each LOAD ERROR"]],
+            title: "35. Auto-calibration. " +
+         		   "Determines when auto-calibration is triggered. Default value: 1."
+       
+       input name: "param37", type: "enum", defaultValue: "1", required: true,
+            options: [["0" : "0 - Device disabled until command or external switch"],
+                      ["1" : "1 - Three attempts to turn on the load"]],
+            title: "37. Behaviour After OVERCURRENT or SURGE. " +
+         		   "The dimmer will turn off when a surge or overcurrent is detected. Default value: 1."
+
+        input name: "param39", type: "number", range: "0..350", defaultValue: "250", required: true,
+             title: "39. Power limit - OVERLOAD. " +
+                    "Reaching the defined value will result in turning off the load. Additional apparent power limit of 350VA is active by default. " +
+                    "Values: 0 = Function Disabled, 1-350 = Power limit (W). Default value: 250."
+
+       input name: "param40", type: "enum", defaultValue: "3", required: true,
+            options: [["0" : "0 - No reaction"],
+                      ["1" : "1 - Turn ON the load"],
+                      ["2" : "2 - Turn OFF the load"],
+                      ["3" : "3 - Load blinking"]],
+            title: "40. Response to General Purpose Alarm. " +
+         		   "Default value: 3."
+
+       input name: "param41", type: "enum", defaultValue: "2", required: true,
+            options: [["0" : "0 - No reaction"],
+                      ["1" : "1 - Turn ON the load"],
+                      ["2" : "2 - Turn OFF the load"],
+                      ["3" : "3 - Load blinking"]],
+            title: "41. Response to Water Flooding Alarm. " +
+         		   "Default value: 2."
+       
+      input name: "param42", type: "enum", defaultValue: "3", required: true,
+            options: [["0" : "0 - No reaction"],
+                      ["1" : "1 - Turn ON the load"],
+                      ["2" : "2 - Turn OFF the load"],
+                      ["3" : "3 - Load blinking"]],
+            title: "42. Response to Smoke, CO or CO2 Alarm. " +
+         		   "Default value: 3."
+
+       input name: "param43", type: "enum", defaultValue: "1", required: true,
+            options: [["0" : "0 - No reaction"],
+                      ["1" : "1 - Turn ON the load"],
+                      ["2" : "2 - Turn OFF the load"],
+                      ["3" : "3 - Load blinking"]],
+            title: "43. Response to Temperature Alarm. " +
+         		   "Default value: 1."  
+
+        input name: "param44", type: "number", range: "1..32767", defaultValue: "600", required: true,
+             title: "44. Time of alarm state. " +
+                    "Values: 1-32767 = Time (s). Default value: 600."
+              
+       input name: "param45", type: "enum", defaultValue: "1", required: true,
+            options: [["0" : "0 - No reaction"],
+                      ["1" : "1 - Send an alarm frame"]],
+            title: "45. OVERLOAD Alarm Report. " +
+         		   "Power consumption above Power Limit. Default value: 1."
+
+       input name: "param46", type: "enum", defaultValue: "1", required: true,
+            options: [["0" : "0 - No reaction"],
+                      ["1" : "1 - Send an alarm frame"]],
+            title: "46. LOAD ERROR Alarm Report. " +
+         		   "No load, load failure, or burnt out bulb. Default value: 1."
+       
+       input name: "param47", type: "enum", defaultValue: "1", required: true,
+            options: [["0" : "0 - No reaction"],
+                      ["1" : "1 - Send an alarm frame"]],
+            title: "47. OVERCURRENT Alarm Report. " +
+         		   "Short circuit, or burnt out bulb causing overcurrent. Default value: 1."
+       
+       input name: "param48", type: "enum", defaultValue: "1", required: true,
+            options: [["0" : "0 - No reaction"],
+                      ["1" : "1 - Send an alarm frame"]],
+            title: "48. SURGE Alarm Report. " +
+         		   "Dimmer 2 output overvoltage. Default value: 1."
+
+       input name: "param49", type: "enum", defaultValue: "1", required: true,
+            options: [["0" : "0 - No reaction"],
+                      ["1" : "1 - Send an alarm frame"]],
+            title: "49. OVERHEAT and VOLTAGE DROP Alarm Report. " +
+         		   "Critical temperature, or low voltage. Default value: 1."
+
+        input name: "param50", type: "number", range: "0..100", defaultValue: "10", required: true,
+             title: "50. Power Reports Threshold. " +
+                    "Power level change that will result in a new power report being sent. " +
+                    "Values: 0 = Reports disabled, 1-100 = % change from previous report. Default value: 10."
+
+        input name: "param52", type: "number", range: "0..32767", defaultValue: "3600", required: true,
+             title: "52. Reporting Period. " +
+                    "The time period between consecutive power and energy reports. " +
+                    "Values: 0 = Reports disabled, 1-32767 = Time period (s). Default value: 3600."
+
+        input name: "param53", type: "number", range: "0..255", defaultValue: "10", required: true,
+             title: "53. Energy Reports Threshold. " +
+                    "Energy level change that will result in a new energy report being sent. " +
+                    "Values: 0 = Reports disabled, 1-255 = 0.01-2.55 kWh. Default value: 10."
+
+       input name: "param54", type: "enum", defaultValue: "0", required: true,
+            options: [["0" : "0 - Self-measurement DISABLED"],
+                      ["1" : "1 - Self-measurement ENABLED"]],
+            title: "54. Self-measurement. " +
+         		   "Include power and energy consumed by the device itself in reports. Default value: 0."
+       
+       input name: "param58", type: "enum", defaultValue: "0", required: true,
+            options: [["0" : "0 - Standard algorithm"],
+                      ["1" : "1 - Based on calibration data"],
+                      ["2" : "2 - Based on control angle"]],
+            title: "58. Method of Calculating Active Power. " +
+         		   "Useful in 2-wire configurations with non-resistive loads. Default value: 0."
+  
+        input name: "param59", type: "number", range: "0..500", defaultValue: "0", required: true,
+             title: "59. Approximated Power at Max Brightness. " +
+                    "Determines the approximate value of the power that will be reported by the device at it's maximum brightness level. " +
+                    "Values: 0-500 = Power (W). Default value: 0."
+
+        input name: "paramAssociationGroup1", type: "bool", defaultValue: true, required: true,
+             title: "The Dimmer 2 provides the association of five groups. " +
+                    "1st Association Group 'Lifeline'. Default value: true"
+
+        input name: "paramAssociationGroup2", type: "bool", defaultValue: true, required: true,
+             title: "2nd Association Group 'On/Off (S1)'. Default value: true"
+
+        input name: "paramAssociationGroup3", type: "bool", defaultValue: false, required: true,
+             title: "3rd Association Group 'Dimmer (S1)'. Default value: false"
+
+        input name: "paramAssociationGroup4", type: "bool", defaultValue: false, required: true,
+             title: "4th Association Group 'On/Off (S2)'. Default value: false"
+
+        input name: "paramAssociationGroup5", type: "bool", defaultValue: false, required: true,
+             title: "5th Association Group 'Dimmer (S2)'. Default value: false"
+    }
+}
+
+def parse(String description) {
+	log.trace(description)
+    log.debug("RAW command: $description")
+	def result = null
+
+    if (description != "updated") {
+		def cmd = zwave.parse(description.replace("98C1", "9881"), [0x20: 1, 0x26: 3, 0x32: 3, 0x25: 1, 0x98: 1, 0x70: 1, 0x85: 2, 0x9B: 1, 0x90: 1, 0x73: 1, 0x30: 1, 0x28: 1, 0x72: 1])
+		if (cmd) {
+			result = zwaveEvent(cmd)
+		}
+    }
+    log.debug "Parsed '${description}' to ${result.inspect()}"
+	return result
+}
+
+def zwaveEvent(hubitat.zwave.commands.sceneactivationv1.SceneActivationSet cmd) {
+	log.debug( "Scene ID: $cmd.sceneId")
+    log.debug( "Dimming Duration: $cmd.dimmingDuration")
+
+    sendEvent(name: "scene", value: "$cmd.sceneId", data: [switchType: "$settings.param20"], descriptionText: "Scene id $cmd.sceneId was activated", isStateChange: true)
+    log.debug( "Scene id $cmd.sceneId was activated" )
+}
+
+// Devices that support the Security command class can send messages in an encrypted form;
+// they arrive wrapped in a SecurityMessageEncapsulation command and must be unencapsulated
+def zwaveEvent(hubitat.zwave.commands.securityv1.SecurityMessageEncapsulation cmd) {
+	log.trace(cmd)
+	def encapsulatedCommand = cmd.encapsulatedCommand([0x20: 1, 0x26: 3, 0x32: 3, 0x25: 1, 0x98: 1, 0x70: 1, 0x85: 2, 0x9B: 1, 0x90: 1, 0x73: 1, 0x30: 1, 0x28: 1, 0x72: 1]) // can specify command class versions here like in zwave.parse
+	if (encapsulatedCommand) {
+		return zwaveEvent(encapsulatedCommand)
+	} else {
+		log.warn "Unable to extract encapsulated cmd from $cmd"
+		createEvent(descriptionText: cmd.toString())
+	}
+}
+
+def zwaveEvent(hubitat.zwave.commands.basicv1.BasicReport cmd) {
+	log.trace(cmd)
+	dimmerEvents(cmd)
+}
+
+def zwaveEvent(hubitat.zwave.commands.basicv1.BasicSet cmd) {
+	log.trace(cmd)
+	dimmerEvents(cmd)
+}
+def zwaveEvent(hubitat.zwave.commands.switchmultilevelv3.SwitchMultilevelReport cmd) {
+	log.trace(cmd)
+	dimmerEvents(cmd)
+}
+
+def zwaveEvent(hubitat.zwave.commands.switchbinaryv1.SwitchBinaryReport cmd)
+{
+	log.trace(cmd)
+	dimmerEvents(cmd)
+}
+
+def dimmerEvents(hubitat.zwave.Command cmd) {
+	log.trace(cmd)
+	def result = []
+	def value = (cmd.value ? "on" : "off")
+	def switchEvent = createEvent(name: "switch", value: value, descriptionText: "$device.displayName was turned $value")
+	result << switchEvent
+	if (cmd.value) {
+		result << createEvent(name: "level", value: cmd.value, unit: "%")
+	}
+	if (switchEvent.isStateChange) {
+		result << response(["delay 3000", zwave.meterV2.meterGet(scale: 2).format()])
+	}
+	return result
+}
+
+def zwaveEvent(hubitat.zwave.commands.meterv3.MeterReport cmd) {
+	log.trace(cmd)
+	if (cmd.meterType == 1) {
+		if (cmd.scale == 0) {
+			return createEvent(name: "energy", value: cmd.scaledMeterValue, unit: "kWh")
+		} else if (cmd.scale == 1) {
+			return createEvent(name: "energy", value: cmd.scaledMeterValue, unit: "kVAh")
+		} else if (cmd.scale == 2) {
+			return createEvent(name: "power", value: Math.round(cmd.scaledMeterValue), unit: "W")
+		} else {
+			return createEvent(name: "electric", value: cmd.scaledMeterValue, unit: ["pulses", "V", "A", "R/Z", ""][cmd.scale - 3])
+		}
+	}
+}
+
+def zwaveEvent(hubitat.zwave.commands.configurationv1.ConfigurationReport cmd) {
+    //Handles Configuration Reports and sets syncPending to False
+    log.trace("zwaveEvent(): Configuration Report received: ${cmd}")
+	sendEvent(name: "syncPending", value: false, isStateChange: true)
+}
+
+def zwaveEvent(hubitat.zwave.commands.sensormultilevelv4.SensorMultilevelReport cmd) {
+    log.trace("zwaveEvent(): SensorMultilevelReport received: ${cmd}")
+}
+
+def zwaveEvent(hubitat.zwave.Command cmd) {
+	log.trace(cmd)
+	log.debug "No handler for $cmd"
+	// Handles all Z-Wave commands we aren't interested in
+	createEvent(descriptionText: cmd.toString(), isStateChange: false)
+}
+
+def on() {
+	log.trace("on")
+	secureSequence([
+			zwave.basicV1.basicSet(value: 0xFF),
+            zwave.switchMultilevelV1.switchMultilevelGet()
+	])
+}
+
+def off() {
+	log.trace("off")
+	secureSequence([
+			zwave.basicV1.basicSet(value: 0x00),
+            zwave.switchMultilevelV1.switchMultilevelGet()
+	])
+}
+
+def poll() {
+	log.trace("poll")
+	secureSequence([
+		zwave.meterV2.meterGet(scale: 0),
+		zwave.meterV2.meterGet(scale: 2)
+	])
+}
+
+def refresh() {
+	log.trace("trace")
+	secureSequence([
+		zwave.meterV2.meterGet(scale: 0),
+		zwave.meterV2.meterGet(scale: 2)
+	])
+}
+
+def reset() {
+	log.trace("reset")
+	return secureSequence([
+    	zwave.switchMultilevelV1.switchMultilevelGet(),
+		zwave.meterV2.meterReset(),
+		zwave.meterV2.meterGet(scale: 0),
+        zwave.meterV2.meterGet(scale: 2)
+	])
+}
+
+def setLevel(level) {
+	log.trace("setlevel")
+	if(level > 99) level = 99
+	secureSequence([
+		zwave.basicV1.basicSet(value: level),
+		zwave.switchMultilevelV1.switchMultilevelGet()
+	], 5000)
+}
+
+def changeSingleParam(paramNum, paramSize, paramValue) {
+	log.debug "changeSingleParam(paramNum: $paramNum, paramSize: $paramSize, paramValue: $paramValue)"
+    def cmds = secureSequence([
+    	zwave.configurationV1.configurationSet(parameterNumber: paramNum, size: paramSize, scaledConfigurationValue: paramValue)
+        ])
+    cmds
+}
+
+def updated() {
+     log.debug "configureAfterSecure()"
+     sendEvent(name: "syncPending", value: true, isStateChange: true)
+        def cmds = secureSequence([
+            zwave.configurationV1.configurationSet(parameterNumber: 1, size: 1, scaledConfigurationValue: param1.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 2, size: 1, scaledConfigurationValue: param2.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 3, size: 1, scaledConfigurationValue: param3.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 4, size: 2, scaledConfigurationValue: param4.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 5, size: 1, scaledConfigurationValue: param5.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 6, size: 2, scaledConfigurationValue: param6.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 7, size: 1, scaledConfigurationValue: param7.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 8, size: 2, scaledConfigurationValue: param8.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 9, size: 1, scaledConfigurationValue: param9.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 10, size: 2, scaledConfigurationValue: param10.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 11, size: 2, scaledConfigurationValue: param11.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 13, size: 1, scaledConfigurationValue: param13.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 15, size: 1, scaledConfigurationValue: param15.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 16, size: 2, scaledConfigurationValue: param16.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 19, size: 1, scaledConfigurationValue: param19.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 20, size: 1, scaledConfigurationValue: param20.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 21, size: 1, scaledConfigurationValue: param21.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 22, size: 1, scaledConfigurationValue: param22.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 23, size: 1, scaledConfigurationValue: param23.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 24, size: 1, scaledConfigurationValue: param24.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 25, size: 1, scaledConfigurationValue: param25.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 26, size: 1, scaledConfigurationValue: param26.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 27, size: 1, scaledConfigurationValue: param27.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 28, size: 1, scaledConfigurationValue: param28.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 29, size: 1, scaledConfigurationValue: param29.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 30, size: 1, scaledConfigurationValue: param30.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 32, size: 1, scaledConfigurationValue: param32.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 34, size: 1, scaledConfigurationValue: param34.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 35, size: 1, scaledConfigurationValue: param35.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 37, size: 1, scaledConfigurationValue: param37.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 39, size: 2, scaledConfigurationValue: param39.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 40, size: 1, scaledConfigurationValue: param40.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 41, size: 1, scaledConfigurationValue: param41.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 42, size: 1, scaledConfigurationValue: param42.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 43, size: 1, scaledConfigurationValue: param43.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 44, size: 2, scaledConfigurationValue: param44.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 45, size: 1, scaledConfigurationValue: param45.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 46, size: 1, scaledConfigurationValue: param46.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 47, size: 1, scaledConfigurationValue: param47.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 48, size: 1, scaledConfigurationValue: param48.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 49, size: 1, scaledConfigurationValue: param49.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 50, size: 1, scaledConfigurationValue: param50.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 52, size: 2, scaledConfigurationValue: param52.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 53, size: 2, scaledConfigurationValue: param53.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 54, size: 1, scaledConfigurationValue: param54.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 58, size: 1, scaledConfigurationValue: param58.toInteger()),
+            zwave.configurationV1.configurationSet(parameterNumber: 59, size: 2, scaledConfigurationValue: param59.toInteger())
+        ])
+
+        // Register for Group 1
+        if(paramAssociationGroup1) {
+        	cmds << secure(zwave.associationV2.associationSet(groupingIdentifier:1, nodeId: [zwaveHubNodeId]))
+        }
+        else {
+        	cmds << secure(zwave.associationV2.associationRemove(groupingIdentifier:1, nodeId: [zwaveHubNodeId]))
+        }
+        // Register for Group 2
+        if(paramAssociationGroup2) {
+        	cmds << secure(zwave.associationV2.associationSet(groupingIdentifier:2, nodeId: [zwaveHubNodeId]))
+        }
+        else {
+        	cmds << secure(zwave.associationV2.associationRemove(groupingIdentifier:2, nodeId: [zwaveHubNodeId]))
+        }
+        // Register for Group 3
+        if(paramAssociationGroup3) {
+        	cmds << secure(zwave.associationV2.associationSet(groupingIdentifier:3, nodeId: [zwaveHubNodeId]))
+        }
+        else {
+        	cmds << secure(zwave.associationV2.associationRemove(groupingIdentifier:3, nodeId: [zwaveHubNodeId]))
+        }
+        // Register for Group 4
+        if(paramAssociationGroup4) {
+        	cmds << secure(zwave.associationV2.associationSet(groupingIdentifier:4, nodeId: [zwaveHubNodeId]))
+        }
+        else {
+        	cmds << secure(zwave.associationV2.associationRemove(groupingIdentifier:4, nodeId: [zwaveHubNodeId]))
+        }
+        // Register for Group 5
+        if(paramAssociationGroups5) {
+        	cmds << secure(zwave.associationV2.associationSet(groupingIdentifier:5, nodeId: [zwaveHubNodeId]))
+        }
+        else {
+        	cmds << secure(zwave.associationV2.associationRemove(groupingIdentifier:5, nodeId: [zwaveHubNodeId]))
+        }
+	cmds 
+}
+
+private secure(hubitat.zwave.Command cmd) {
+	log.trace(cmd)
+	zwave.securityV1.securityMessageEncapsulation().encapsulate(cmd).format()
+}
+
+private secureSequence(commands, delay=200) {
+	log.debug "$commands"
+	delayBetween(commands.collect{ secure(it) }, delay)
+}
