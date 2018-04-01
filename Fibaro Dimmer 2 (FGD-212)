@@ -15,7 +15,6 @@ metadata {
 		capability "Polling"
 		capability "Refresh"
 		capability "Sensor"
-		capability "Configuration"
         capability "Switch Level"
 
         attribute "scene", "number"           //Extending Fibaro Dimmer 2 devices with scene attribute
