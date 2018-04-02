@@ -1,9 +1,9 @@
 /**
  *  
- *	FIBARO RGBW Controller (FGRGBWM-441) Device Type - For use on Hubitat
+ *	FIBARO RGBW Controller (FGRGBWM-441) Driver - For use on Hubitat
  *  
  *	Author: Robin Winbourne
- *	Date: 2018-04-02 
+ *	Date: 2018-04-03 
  */
  
  metadata {
