@@ -41,7 +41,7 @@
         command "WhiteOff"
         command "WhiteOn"
         
-        command "updateSingleParam" // This custom command can be used with Rule Machine or webCoRE, to send parameter values  (paramNum & paramValue) to the device
+        command "updateZwaveParam" // This custom command can be used with Rule Machine or webCoRE, to send parameter values  (paramNum & paramValue) to the device
         
         attribute "whiteLevel", "string"
       
@@ -234,9 +234,19 @@ def sendRGB(redHex, greenHex, blueHex) {
     cmd
 }
 
- def updateSingleparam(paramNum, paramValue, paramSize) {
-	log.debug "Updating single Parameter (paramNum: $paramNum, paramValue: $paramValue, paramSize: $paramSize)"
-    	zwave.configurationV1.configurationSet(parameterNumber: paramNum, scaleConfigurationValue: paramValue, size: paramSize).format()
+ def updateZwaveParam(params) {
+	if ( params ) {   
+        def pNumber = params.paramNumber
+        def pSize	= params.size
+        def pValue	= [params.value]
+        log.debug "Updating ${device.displayName} parameter number '${pNumber}' with value '${pValue}' with size of '${pSize}'"
+
+		def cmds = []
+        cmds << zwave.configurationV1.configurationSet(configurationValue: pValue, parameterNumber: pNumber, size: pSize).format()
+        
+        cmds << zwave.configurationV1.configurationGet(parameterNumber: pNumber).format()
+        delayBetween(cmds, 1500)        
+    }
 }
 
 def updated() {
