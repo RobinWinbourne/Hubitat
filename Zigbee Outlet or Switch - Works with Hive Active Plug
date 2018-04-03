@@ -6,6 +6,7 @@
  *	Date: 2018-04-03 
  */
 
+
 metadata {
     definition (name: "ZigBee Outlet / Switch - (for Hive Active Plug)", namespace: "Hubitat", author: "Robin Winbourne") {
         capability "Actuator"
@@ -23,10 +24,34 @@ metadata {
     }
 }
 
+// Parse incoming device messages to generate events
+def parse(String description) {
+    log.debug "description is $description"
+    def event = zigbee.getEvent(description)
+    if (event) {
+        sendEvent(event)
+    }
+    else {
+        log.warn "DID NOT PARSE MESSAGE for description : $description"
+        log.debug zigbee.parseDescriptionAsMap(description)
+    }
+}
+
 def off() {
     zigbee.off()
 }
 
 def on() {
     zigbee.on()
+}
+
+def refresh() {
+    zigbee.onOffRefresh() + zigbee.onOffConfig()
+}
+
+def configure() {
+    // Device-Watch allows 2 check-in misses from device + ping (plus 2 min lag time)
+    sendEvent(name: "checkInterval", value: 2 * 10 * 60 + 2 * 60, displayed: false, data: [protocol: "zigbee", hubHardwareId: device.hub.hardwareID])
+    log.debug "Configuring Reporting and Bindings."
+    zigbee.onOffRefresh() + zigbee.onOffConfig()
 }
